@@ -1,5 +1,8 @@
 '''The container for recorded requests and responses'''
 
+
+from mimetools import Message
+from StringIO import StringIO
 import os
 import tempfile
 try:
@@ -12,7 +15,6 @@ from mocket import Mocket, MocketEntry
 
 # Internal imports
 from .persist import load_cassette, save_cassette
-from .utils import get_host_and_port
 
 class Cassette(MocketEntry):
 
@@ -95,3 +97,15 @@ class Cassette(MocketEntry):
         self._save()
         Mocket.disable()
         Mocket.reset()
+
+
+def get_host_and_port(raw_message):
+    request_line, headers = raw_message.split('\r\n', 1)
+    headers = Message(StringIO(headers))
+    host_header = headers.get('Host', ':')
+    try:
+        host, port = host_header.split(':', 1)
+        port = int(port)
+    except ValueError:
+        host, port = host_header, 80
+    return host, port
