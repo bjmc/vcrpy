@@ -8,13 +8,22 @@ except ImportError:
     from .compat.counter import Counter
     from .compat.ordereddict import OrderedDict
 
-from socket import Sockpuppet, MocketEntry
+from mocket import Mocket, MocketEntry
 
 # Internal imports
-from .patch import install, reset
 from .persist import load_cassette, save_cassette
+from .utils import get_host_and_port
 
 class Cassette(MocketEntry):
+
+    def __init__(self, path):
+        self._path = path
+        self.data = OrderedDict()
+        self.play_counts = Counter()
+
+    # Unused; included for compatibility with Mocket
+    location = (None, None)
+
     '''A container for recorded requests and responses'''
     @classmethod
     def load(cls, path):
@@ -27,11 +36,6 @@ class Cassette(MocketEntry):
         except IOError:
             pass
         return new_cassette
-
-    def __init__(self, path):
-        self._path = path
-        self.data = OrderedDict()
-        self.play_counts = Counter()
 
     @property
     def play_count(self):
@@ -78,12 +82,16 @@ class Cassette(MocketEntry):
 
     def __enter__(self):
         # Register this casette with Mocket.
-        Sockpuppet.register(self)
+        for req in self.requests:
+            Mocket._entries[get_host_and_port(req)].append(self)
         # Patch the real socket instance with a fake one.
-        Sockpuppet.enable()
+        Mocket.enable()
         return self
 
     def __exit__(self, typ, value, traceback):
+        for exchange in Mocket._record:
+            self.append(exchange.request,
+                        exchange.response)
         self._save()
-        Sockpuppet.disable()
-        Sockpuppet.reset()
+        Mocket.disable()
+        Mocket.reset()
