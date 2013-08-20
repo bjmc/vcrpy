@@ -8,11 +8,13 @@ except ImportError:
     from .compat.counter import Counter
     from .compat.ordereddict import OrderedDict
 
+from socket import Sockpuppet, MocketEntry
+
 # Internal imports
 from .patch import install, reset
 from .persist import load_cassette, save_cassette
 
-class Cassette(object):
+class Cassette(MocketEntry):
     '''A container for recorded requests and responses'''
     @classmethod
     def load(cls, path):
@@ -57,6 +59,9 @@ class Cassette(object):
         '''Find the response corresponding to a request'''
         return self.data[request]
 
+    # For compatibility with Mocketize API...
+    get_response = response_of
+
     def _save(self):
         save_cassette(self._path, self.requests, self.responses)
 
@@ -72,10 +77,13 @@ class Cassette(object):
         return request in self.data
 
     def __enter__(self):
-        '''Patch the fetching libraries we know about'''
-        install(self)
+        # Register this casette with Mocket.
+        Sockpuppet.register(self)
+        # Patch the real socket instance with a fake one.
+        Sockpuppet.enable()
         return self
 
     def __exit__(self, typ, value, traceback):
         self._save()
-        reset()
+        Sockpuppet.disable()
+        Sockpuppet.reset()
